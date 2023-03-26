@@ -1,55 +1,66 @@
 package domain
 
 import (
-	"errors"
-	"ordering/domain/models"
+	"fmt"
+	"ordering_v2/domain/models"
 	"reflect"
 )
 
-const (
-	prefix = "order"
-)
-
 var (
-	ErrCustomerOrOptionsMustNotBeEmpty = errors.New("customer or options must not be empty")
-	ErrOrderHasAlreadyBeenComfirmed    = errors.New("the order has already been confirmed")
+	error_order_had_submitted             = models.NewOrderHadSubmittedError()
+	error_customer_field_is_empty         = models.NewOrderCustomerFieldIsEmptyError()
+	error_options_less_than_equal_to_zero = models.NewOrderOptionsFieldLessThanEqualToZeroError()
 )
 
 type Order struct {
-	OrderID     models.CodeID   `json:"order_id" bson:"order_id"`
-	Customer    models.Customer `json:"customer" bson:"customer"`
-	Product     models.CodeID   `json:"product_id" bson:"product_id"`
+	OrderID     string          `json:"order_id" bson:"order_id"`
 	Options     []models.Option `json:"options" bson:"options"`
-	TotalPrice  float64         `json:"total_price" bson:"total_price"`
-	IsSubmitted bool            `json:"is_submitted" bson:"is_submitted"`
+	Customer    models.Customer `json:"customer" bson:"customer"`
+	IsSubmitted bool            `bson:"is_submitted"`
 }
 
-func InitializeOrder() Order {
+func NewOrder() Order {
 	return Order{}
 }
-func (ordering *Order) CreateNewOrderWithOptions(customer models.Customer, options []models.Option) (*models.CodeID, error) {
 
-	if reflect.DeepEqual(customer, models.Customer{}) || options == nil {
-		return nil, ErrCustomerOrOptionsMustNotBeEmpty
+func (ordering *Order) CreateOrderWithOptionAndCustomer(order_id string, customer models.Customer, options []models.Option) error {
+
+	customer_is_empty := reflect.DeepEqual(customer, models.Customer{})
+
+	if customer_is_empty {
+		return error_customer_field_is_empty
+	}
+	if len(options) <= 0 {
+		return error_options_less_than_equal_to_zero
 	}
 
-	var price float64
-	for _, o := range options {
-		price += o.Price
-	}
-
-	order_id := models.NewCodeID(prefix)
 	ordering.OrderID = order_id
 	ordering.Customer = customer
 	ordering.Options = options
-	ordering.TotalPrice = price
-	return &order_id, nil
+
+	// append event
+	return nil
+}
+
+func (ordering *Order) UpdateOptionsToOrder(options []models.Option) error {
+
+	if ordering.IsSubmitted {
+		return error_order_had_submitted
+	}
+
+	ordering.Options = options
+
+	// append event
+	return nil
 }
 
 func (ordering *Order) Submit() error {
+	fmt.Println(ordering.IsSubmitted)
 	if ordering.IsSubmitted {
-		return ErrOrderHasAlreadyBeenComfirmed
+		return error_order_had_submitted
 	}
 	ordering.IsSubmitted = true
+
+	// append event
 	return nil
 }

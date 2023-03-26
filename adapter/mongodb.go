@@ -3,75 +3,90 @@ package adapter
 import (
 	"context"
 	"fmt"
-	"ordering/domain"
-	"ordering/domain/models"
+	"ordering_v2/domain"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type MongoDBRepositoryAdapter struct {
+type OrderRepositoryMongoDB struct {
 	collection *mongo.Collection
 }
 
-func InitializeMongoDBRepository(connection_string, database, collection, username, password string) (domain.OrderRepository, error) {
-	clientOption := options.Client().ApplyURI(connection_string)
-
+func NewOrderRepositoryMongoDB(connection_string, database, collection, username, password string) (domain.OrderRepository, error) {
+	client_option := options.Client().ApplyURI(connection_string)
 	if username != "" && password != "" {
 		credentials := options.Credential{
 			Username: username,
 			Password: password,
 		}
-		clientOption.Auth = &credentials
+		client_option.Auth = &credentials
 	}
 
-	client, err := mongo.NewClient(clientOption)
+	client, err := mongo.NewClient(client_option)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancle := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancle()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	err = client.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return &MongoDBRepositoryAdapter{
-		collection: client.Database(database).Collection(collection),
-	}, nil
+	return OrderRepositoryMongoDB{collection: client.Database(database).Collection(collection)}, nil
 }
 
-func (repo *MongoDBRepositoryAdapter) Create(order domain.Order) (*models.CodeID, error) {
-	ctx := context.Background()
-	fmt.Println(order)
-	_, err := repo.collection.InsertOne(ctx, order)
-	if err != nil {
-		return nil, err
-	}
-	return &order.OrderID, nil
+func (repo OrderRepositoryMongoDB) NextIdentity() string {
+	_id := primitive.NewObjectID()
+	order_id := fmt.Sprintf("OR-%s", _id.Hex())
+	return order_id
 }
-func (repo *MongoDBRepositoryAdapter) FormID(order_id models.CodeID) (*domain.Order, error) {
+func (repo OrderRepositoryMongoDB) FormID(order_id string) (*domain.Order, error) {
 	ctx := context.Background()
-	var order = domain.Order{}
+	var order = domain.NewOrder()
 
-	err := repo.collection.FindOne(ctx, bson.M{"order_id": order_id}).Decode(&order)
+	err := repo.collection.FindOne(ctx, bson.M{
+		"order_id": order_id,
+	}).Decode(&order)
+
 	if err != nil {
 		return nil, err
 	}
 
 	return &order, nil
 }
-func (repo *MongoDBRepositoryAdapter) Save(order domain.Order) error {
+func (repo OrderRepositoryMongoDB) Save(entity domain.Order) error {
 	ctx := context.Background()
-	filter := bson.M{"order_id": order.OrderID}
-	update := bson.M{"$set": order}
-	_, err := repo.collection.UpdateOne(ctx, filter, update)
+	filter := bson.M{"order_id": entity.OrderID}
+
+	// Check if entity exists in database
+	count, err := repo.collection.CountDocuments(ctx, filter, nil)
 	if err != nil {
 		return err
 	}
+
+	if count > 0 {
+		// Entity exists in database, update it
+		update := bson.M{
+			"$set": entity,
+		}
+		_, err = repo.collection.UpdateOne(ctx, filter, update)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Entity does not exist in database, insert new document
+		_, err := repo.collection.InsertOne(ctx, entity)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

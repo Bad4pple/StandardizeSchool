@@ -1,12 +1,12 @@
 package handler
 
-import "ordering/domain/models"
+import "ordering_v2/domain/models"
 
-type CreateNewOrderRequestModel struct {
+type CreateNewOrderScheme struct {
 	Customer models.Customer `json:"customer"`
 	Options  []models.Option `json:"options"`
 }
 
-type CreateNewOrderResponseModel struct {
-	OrderID models.CodeID `json:"order_id"`
+type OrderUpdateOptions struct {
+	Options []models.Option `json:"options"`
 }

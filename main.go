@@ -2,15 +2,32 @@ package main
 
 import (
 	"log"
-	"ordering/adapter"
-	"ordering/handler"
-	"ordering/services"
+	"ordering_v2/adapter"
+	"ordering_v2/domain"
+	"ordering_v2/handler"
+	"ordering_v2/services"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func main() {
-	order_repo, err := adapter.InitializeMongoDBRepository(
+	order_repository := initMongoConfig()
+	order_service := services.NewOrderServices(order_repository)
+	order_handler := handler.NewOrderHanlder(order_service)
+	app := fiber.New()
+	api := app.Group("/api/orders")
+
+	api.Post("/", order_handler.CreateNewOrderHanlder)
+	api.Get("/:order_id", order_handler.GetOrderByID)
+	api.Put("/:order_id", order_handler.UpdateOptionsToOrder)
+	api.Put("/:order_id/submission", order_handler.SubmitOrder)
+
+	app.Listen(":8000")
+}
+
+func initMongoConfig() domain.OrderRepository {
+
+	order_repository, err := adapter.NewOrderRepositoryMongoDB(
 		"mongodb://root:example@127.0.0.1:27017",
 		"StandardizeWarehourse",
 		"orders",
@@ -21,16 +38,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	order_service := services.InitializeOrderService(order_repo)
-	order_handler := handler.InitializeOrderHandler(order_service)
-
-	app := fiber.New()
-	api := app.Group("/api/orders")
-
-	api.Post("/", order_handler.CreateNewOrderHandler)
-	api.Get("/:order_id", order_handler.GetOrderByID)
-	api.Put("/:order_id/options", order_handler.SubmitOrder)
-	api.Put("/:order_id/submission", order_handler.SubmitOrder)
-
-	app.Listen(":8000")
+	return order_repository
 }
