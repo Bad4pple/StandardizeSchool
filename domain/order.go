@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"ordering_v2/domain/models"
 	"reflect"
 )
@@ -55,7 +54,6 @@ func (ordering *Order) UpdateOptionsToOrder(options []models.Option) error {
 }
 
 func (ordering *Order) Submit() error {
-	fmt.Println(ordering.IsSubmitted)
 	if ordering.IsSubmitted {
 		return error_order_had_submitted
 	}

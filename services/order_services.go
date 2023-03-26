@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"ordering_v2/domain"
 	"ordering_v2/domain/models"
 )
@@ -42,13 +41,12 @@ func (order_service orderServices) UpdateOrderOptions(order_id string, options [
 	if err != nil {
 		return err
 	}
-
+	order_service.repo.Save(*order)
 	return nil
 }
 
 func (order_service orderServices) SubmitOrder(order_id string) error {
 	order, err := order_service.repo.FormID(order_id)
-	fmt.Println(order)
 	if err != nil {
 		return err
 	}
